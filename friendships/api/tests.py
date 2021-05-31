@@ -8,11 +8,10 @@ UNFOLLOW_URL = '/api/friendships/{}/unfollow/'
 FOLLOWERS_URL = '/api/friendships/{}/followers/'
 FOLLOWINGS_URL = '/api/friendships/{}/followings/'
 
+
 class FriendshipApiTests(TestCase):
 
     def setUp(self):
-        self.anonymous_client = APIClient()
-
         self.ray = self.create_user('ray')
         self.ray_client = APIClient()
         self.ray_client.force_authenticate(self.ray)
