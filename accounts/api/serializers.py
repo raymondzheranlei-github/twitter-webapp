@@ -6,7 +6,7 @@ from rest_framework import exceptions
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
+        fields = ('id', 'username', 'email')
 
 
 class UserSerializerForTweet(serializers.ModelSerializer):
@@ -16,6 +16,10 @@ class UserSerializerForTweet(serializers.ModelSerializer):
 
 
 class UserSerializerForFriendship(UserSerializerForTweet):
+    pass
+
+
+class UserSerializerForComment(UserSerializerForTweet):
     pass
 
 
