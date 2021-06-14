@@ -1,8 +1,10 @@
-from testing_utils.testcases import TestCase
+from comments.models import Comment
+from django.utils import timezone
 from rest_framework.test import APIClient
-
+from testing_utils.testcases import TestCase
 
 COMMENT_URL = '/api/comments/'
+COMMENT_DETAIL_URL = '/api/comments/{}/'
 
 
 class CommentApiTests(TestCase):
@@ -51,3 +53,54 @@ class CommentApiTests(TestCase):
         self.assertEqual(response.data['user']['id'], self.ray.id)
         self.assertEqual(response.data['tweet_id'], self.tweet.id)
         self.assertEqual(response.data['content'], '1')
+
+    def test_destroy(self):
+        comment = self.create_comment(self.ray, self.tweet)
+        url = COMMENT_DETAIL_URL.format(comment.id)
+
+        # Unauthenticated client cannot delete
+        response = self.anonymous_client.delete(url)
+        self.assertEqual(response.status_code, 403)
+
+        # Unauthorized user of the object cannot delete
+        response = self.lux_client.delete(url)
+        self.assertEqual(response.status_code, 403)
+
+        # Only owner can delete
+        count = Comment.objects.count()
+        response = self.ray_client.delete(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Comment.objects.count(), count - 1)
+
+    def test_update(self):
+        comment = self.create_comment(self.ray, self.tweet, 'original')
+        another_tweet = self.create_tweet(self.lux)
+        url = COMMENT_DETAIL_URL.format(comment.id)
+
+        # while using put
+        # Unauthenticated client cannot update
+        response = self.anonymous_client.put(url, {'content': 'new'})
+        self.assertEqual(response.status_code, 403)
+        # Unauthorized user of the object cannot update
+        response = self.lux_client.put(url, {'content': 'new'})
+        self.assertEqual(response.status_code, 403)
+        comment.refresh_from_db()
+        self.assertNotEqual(comment.content, 'new')
+        # Can only update content. All else updates will be silently processed
+        before_updated_at = comment.updated_at
+        before_created_at = comment.created_at
+        now = timezone.now()
+        response = self.ray_client.put(url, {
+            'content': 'new',
+            'user_id': self.lux.id,
+            'tweet_id': another_tweet.id,
+            'created_at': now,
+        })
+        self.assertEqual(response.status_code, 200)
+        comment.refresh_from_db()
+        self.assertEqual(comment.content, 'new')
+        self.assertEqual(comment.user, self.ray)
+        self.assertEqual(comment.tweet, self.tweet)
+        self.assertEqual(comment.created_at, before_created_at)
+        self.assertNotEqual(comment.created_at, now)
+        self.assertNotEqual(comment.updated_at, before_updated_at)
