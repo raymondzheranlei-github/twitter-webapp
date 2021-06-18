@@ -9,6 +9,7 @@ from comments.api.serializers import (
 )
 from comments.api.permissions import IsObjectOwner
 from utils.decorators import required_params
+from inbox.services import NotificationService
 
 
 class CommentViewSet(viewsets.GenericViewSet):
@@ -52,6 +53,7 @@ class CommentViewSet(viewsets.GenericViewSet):
                 'errors': serializer.errors,
             }, status=status.HTTP_400_BAD_REQUEST)
         comment = serializer.save()
+        NotificationService.send_comment_notification(comment)
         return Response(
             CommentSerializer(comment, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
