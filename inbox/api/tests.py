@@ -4,6 +4,7 @@ from testing_utils.testcases import TestCase
 
 COMMENT_URL = '/api/comments/'
 LIKE_URL = '/api/likes/'
+NOTIFICATION_URL = '/api/notifications/'
 
 
 class NotificationTests(TestCase):
@@ -28,3 +29,102 @@ class NotificationTests(TestCase):
             'object_id': self.lux_tweet.id,
         })
         self.assertEqual(Notification.objects.count(), 1)
+
+
+class NotificationApiTests(TestCase):
+
+    def setUp(self):
+        self.ray, self.ray_client = self.create_user_and_client('ray')
+        self.lux, self.lux_client = self.create_user_and_client('lux')
+        self.ray_tweet = self.create_tweet(self.ray)
+
+    def test_unread_count(self):
+        # lux likes a ray's tweet
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'tweet',
+            'object_id': self.ray_tweet.id,
+        })
+
+        url = '/api/notifications/unread-count/'
+        response = self.ray_client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['unread_count'], 1)
+
+        # lux commented a ray's tweet
+        comment = self.create_comment(self.ray, self.ray_tweet)
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'comment',
+            'object_id': comment.id,
+        })
+        # ray can see two unread notifications
+        response = self.ray_client.get(url)
+        self.assertEqual(response.data['unread_count'], 2)
+        # lux cannot see any unread notification
+        response = self.lux_client.get(url)
+        self.assertEqual(response.data['unread_count'], 0)
+
+    def test_mark_all_as_read(self):
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'tweet',
+            'object_id': self.ray_tweet.id,
+        })
+        comment = self.create_comment(self.ray, self.ray_tweet)
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'comment',
+            'object_id': comment.id,
+        })
+
+        unread_url = '/api/notifications/unread-count/'
+        response = self.ray_client.get(unread_url)
+        self.assertEqual(response.data['unread_count'], 2)
+
+        mark_url = '/api/notifications/mark-all-as-read/'
+        response = self.ray_client.get(mark_url)
+        self.assertEqual(response.status_code, 405)
+
+        # lux cannot mark ray's notifications as read
+        response = self.lux_client.post(mark_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['marked_count'], 0)
+        response = self.ray_client.get(unread_url)
+        self.assertEqual(response.data['unread_count'], 2)
+
+        # ray can mark his own notifications as read
+        response = self.ray_client.post(mark_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['marked_count'], 2)
+        response = self.ray_client.get(unread_url)
+        self.assertEqual(response.data['unread_count'], 0)
+
+    def test_list(self):
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'tweet',
+            'object_id': self.ray_tweet.id,
+        })
+        comment = self.create_comment(self.ray, self.ray_tweet)
+        self.lux_client.post(LIKE_URL, {
+            'content_type': 'comment',
+            'object_id': comment.id,
+        })
+
+        # unauthenticated user cannot access api
+        response = self.anonymous_client.get(NOTIFICATION_URL)
+        self.assertEqual(response.status_code, 403)
+        # lux cannot see any notifications
+        response = self.lux_client.get(NOTIFICATION_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 0)
+        # ray can see two notifications
+        response = self.ray_client.get(NOTIFICATION_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 2)
+        # one unread after being tagged
+        notification = self.ray.notifications.first()
+        notification.unread = False
+        notification.save()
+        response = self.ray_client.get(NOTIFICATION_URL)
+        self.assertEqual(response.data['count'], 2)
+        response = self.ray_client.get(NOTIFICATION_URL, {'unread': True})
+        self.assertEqual(response.data['count'], 1)
+        response = self.ray_client.get(NOTIFICATION_URL, {'unread': False})
+        self.assertEqual(response.data['count'], 1)
