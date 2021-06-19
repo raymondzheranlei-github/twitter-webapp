@@ -44,11 +44,11 @@ class SignupSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if User.objects.filter(username=data['username'].lower()).exists():
             raise exceptions.ValidationError({
-                'message': 'This username has been used'
+                'username': 'This username has been used'
             })
         if User.objects.filter(email=data['email'].lower()).exists():
             raise exceptions.ValidationError({
-                'message': 'This email address has been used'
+                'email': 'This email address has been used'
             })
         return data
 
@@ -62,5 +62,7 @@ class SignupSerializer(serializers.ModelSerializer):
             email=email,
             password=password,
         )
+        # create User Profile object
+        user.profile
         return user
 
