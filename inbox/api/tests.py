@@ -10,6 +10,7 @@ NOTIFICATION_URL = '/api/notifications/'
 class NotificationTests(TestCase):
 
     def setUp(self):
+        self.clear_cache()
         self.ray, self.ray_client = self.create_user_and_client('ray')
         self.lux, self.lux_client = self.create_user_and_client('lux')
         self.lux_tweet = self.create_tweet(self.lux)
@@ -34,6 +35,7 @@ class NotificationTests(TestCase):
 class NotificationApiTests(TestCase):
 
     def setUp(self):
+        self.clear_cache()
         self.ray, self.ray_client = self.create_user_and_client('ray')
         self.lux, self.lux_client = self.create_user_and_client('lux')
         self.ray_tweet = self.create_tweet(self.ray)
