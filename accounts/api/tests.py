@@ -15,6 +15,7 @@ class AccountApiTests(TestCase):
 
     def setUp(self):
         # execute when test functions are executing
+        self.clear_cache()
         self.client = APIClient()
         self.user = self.create_user(
             username='admin',

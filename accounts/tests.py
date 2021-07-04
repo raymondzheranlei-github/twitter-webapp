@@ -4,6 +4,9 @@ from testing_utils.testcases import TestCase
 
 class UserProfileTests(TestCase):
 
+    def SetUp(self):
+        self.clear_cache()
+
     def test_profile_property(self):
         ray = self.create_user('ray')
         self.assertEqual(UserProfile.objects.count(), 0)
