@@ -128,3 +128,25 @@ class NewsFeedApiTests(TestCase):
         self.assertEqual(results[0]['tweet']['user']['username'], 'diana')
         self.assertEqual(results[0]['tweet']['user']['nickname'], 'darius')
         self.assertEqual(results[1]['tweet']['user']['username'], 'ray')
+
+    def test_tweet_cache(self):
+        tweet = self.create_tweet(self.ray, 'content1')
+        self.create_newsfeed(self.diana, tweet)
+        response = self.diana_client.get(NEWSFEEDS_URL)
+        results = response.data['results']
+        self.assertEqual(results[0]['tweet']['user']['username'], 'ray')
+        self.assertEqual(results[0]['tweet']['content'], 'content1')
+
+        # update username
+        self.ray.username = 'raymond'
+        self.ray.save()
+        response = self.diana_client.get(NEWSFEEDS_URL)
+        results = response.data['results']
+        self.assertEqual(results[0]['tweet']['user']['username'], 'raymond')
+
+        # update content, check if key in cache will be deleted
+        tweet.content = 'content2'
+        tweet.save()
+        response = self.diana_client.get(NEWSFEEDS_URL)
+        results = response.data['results']
+        self.assertEqual(results[0]['tweet']['content'], 'content2')
