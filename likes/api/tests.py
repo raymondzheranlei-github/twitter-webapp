@@ -218,3 +218,43 @@ class LikeApiTests(TestCase):
         self.assertEqual(len(response.data['likes']), 2)
         self.assertEqual(response.data['likes'][0]['user']['id'], self.ray.id)
         self.assertEqual(response.data['likes'][1]['user']['id'], self.lux.id)
+
+    def test_likes_count_with_cache(self):
+        tweet = self.create_tweet(self.ray)
+        self.create_newsfeed(self.ray, tweet)
+        self.create_newsfeed(self.lux, tweet)
+
+        data = {'content_type': 'tweet', 'object_id': tweet.id}
+        tweet_url = TWEET_DETAIL_API.format(tweet.id)
+        for i in range(3):
+            _, client = self.create_user_and_client('someone{}'.format(i))
+            client.post(LIKE_BASE_URL, data)
+            # check tweet api
+            response = client.get(tweet_url)
+            self.assertEqual(response.data['likes_count'], i + 1)
+            tweet.refresh_from_db()
+            self.assertEqual(tweet.likes_count, i + 1)
+
+        self.lux_client.post(LIKE_BASE_URL, data)
+        response = self.lux_client.get(tweet_url)
+        self.assertEqual(response.data['likes_count'], 4)
+        tweet.refresh_from_db()
+        self.assertEqual(tweet.likes_count, 4)
+
+        # check newsfeed api
+        newsfeed_url = '/api/newsfeeds/'
+        response = self.ray_client.get(newsfeed_url)
+        self.assertEqual(response.data['results'][0]['tweet']['likes_count'], 4)
+        response = self.lux_client.get(newsfeed_url)
+        self.assertEqual(response.data['results'][0]['tweet']['likes_count'], 4)
+
+        # lux canceled likes
+        self.lux_client.post(LIKE_BASE_URL + 'cancel/', data)
+        tweet.refresh_from_db()
+        self.assertEqual(tweet.likes_count, 3)
+        response = self.lux_client.get(tweet_url)
+        self.assertEqual(response.data['likes_count'], 3)
+        response = self.ray_client.get(newsfeed_url)
+        self.assertEqual(response.data['results'][0]['tweet']['likes_count'], 3)
+        response = self.lux_client.get(newsfeed_url)
+        self.assertEqual(response.data['results'][0]['tweet']['likes_count'], 3)
