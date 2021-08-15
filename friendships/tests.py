@@ -35,13 +35,11 @@ class HBaseTests(TestCase):
         return int(time.time() * 1000000)
 
     def test_save_and_get(self):
-        print(">>>>>>>>>>>>")
         timestamp = self.ts_now
         following = HBaseFollowing(from_user_id=123, to_user_id=34, created_at=timestamp)
         following.save()
 
         instance = HBaseFollowing.get(from_user_id=123, created_at=timestamp)
-        print("instance1", instance)
 
         self.assertEqual(instance.from_user_id, 123)
         self.assertEqual(instance.to_user_id, 34)
@@ -55,7 +53,6 @@ class HBaseTests(TestCase):
 
         # object does not exist, return None
         instance = HBaseFollowing.get(from_user_id=123, created_at=self.ts_now)
-        print("instance2", instance)
         self.assertEqual(instance, None)
 
     def test_create_and_get(self):
@@ -66,7 +63,6 @@ class HBaseTests(TestCase):
         except EmptyColumnError:
             exception_raised = True
         self.assertEqual(exception_raised, True)
-        print("exception_raised1", exception_raised)
 
         # invalid row_key
         try:
@@ -76,7 +72,6 @@ class HBaseTests(TestCase):
             exception_raised = True
             self.assertEqual(str(e), 'created_at is missing in row key')
         self.assertEqual(exception_raised, True)
-        print("exception_raised2", exception_raised)
 
         ts = self.ts_now
         HBaseFollower.create(from_user_id=1, to_user_id=2, created_at=ts)
@@ -84,7 +79,6 @@ class HBaseTests(TestCase):
         self.assertEqual(instance.from_user_id, 1)
         self.assertEqual(instance.to_user_id, 2)
         self.assertEqual(instance.created_at, ts)
-        print("instance3", instance)
 
         # can not get if row key missing
         try:
@@ -94,3 +88,49 @@ class HBaseTests(TestCase):
             exception_raised = True
             self.assertEqual(str(e), 'created_at is missing in row key')
         self.assertEqual(exception_raised, True)
+
+    def test_filter(self):
+        HBaseFollowing.create(from_user_id=1, to_user_id=2, created_at=self.ts_now)
+        HBaseFollowing.create(from_user_id=1, to_user_id=3, created_at=self.ts_now)
+        HBaseFollowing.create(from_user_id=1, to_user_id=4, created_at=self.ts_now)
+
+        followings = HBaseFollowing.filter(prefix=(1, None))
+        self.assertEqual(3, len(followings))
+        self.assertEqual(followings[0].from_user_id, 1)
+        self.assertEqual(followings[0].to_user_id, 2)
+        self.assertEqual(followings[1].from_user_id, 1)
+        self.assertEqual(followings[1].to_user_id, 3)
+        self.assertEqual(followings[2].from_user_id, 1)
+        self.assertEqual(followings[2].to_user_id, 4)
+
+        # test limit
+        results = HBaseFollowing.filter(prefix=(1, None), limit=1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].to_user_id, 2)
+
+        results = HBaseFollowing.filter(prefix=(1, None), limit=2)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].to_user_id, 2)
+        self.assertEqual(results[1].to_user_id, 3)
+
+        results = HBaseFollowing.filter(prefix=(1, None), limit=4)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0].to_user_id, 2)
+        self.assertEqual(results[1].to_user_id, 3)
+        self.assertEqual(results[2].to_user_id, 4)
+
+        results = HBaseFollowing.filter(start=(1, results[1].created_at), limit=2)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].to_user_id, 3)
+        self.assertEqual(results[1].to_user_id, 4)
+
+        # test reverse
+        results = HBaseFollowing.filter(prefix=(1, None), limit=2, reverse=True)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].to_user_id, 4)
+        self.assertEqual(results[1].to_user_id, 3)
+
+        results = HBaseFollowing.filter(start=(1, results[1].created_at), limit=2, reverse=True)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].to_user_id, 3)
+        self.assertEqual(results[1].to_user_id, 2)
