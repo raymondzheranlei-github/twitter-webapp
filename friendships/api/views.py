@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from friendships.models import Friendship
+from friendships.services import FriendshipService
 from friendships.api.serializers import (
     FollowingSerializer,
     FollowerSerializer,
@@ -38,11 +39,15 @@ class FriendshipViewSet(viewsets.GenericViewSet):
     @action(methods=['POST'], detail=True, permission_classes=[IsAuthenticated])
     @method_decorator(ratelimit(key='user', rate='10/s', method='POST', block=True))
     def follow(self, request, pk):
+        if FriendshipService.has_followed(request.user.id, int(pk)):
+            return Response({
+                'success': True,
+                'duplicate': True,
+            }, status=status.HTTP_201_CREATED)
         serializer = FriendshipSerializerForCreate(data={
             'from_user_id': request.user.id,
             'to_user_id': pk,
         })
-
         if not serializer.is_valid():
             return Response({
                 'success': False,
@@ -64,10 +69,7 @@ class FriendshipViewSet(viewsets.GenericViewSet):
                 'success': False,
                 'message': 'You cannot unfollow yourself'
             }, status=status.HTTP_400_BAD_REQUEST)
-        deleted, _ = Friendship.objects.filter(
-            from_user=request.user,
-            to_user=unfollow_user,
-        ).delete()
+        deleted = FriendshipService.unfollow(request.user.id, unfollow_user.id)
         return Response(
             {'success': True, 'deleted': deleted},
             status=status.HTTP_204_NO_CONTENT,

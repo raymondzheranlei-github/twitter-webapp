@@ -10,7 +10,7 @@ import time
 class FriendshipServiceTests(TestCase):
 
     def setUp(self):
-        self.clear_cache()
+        super(FriendshipServiceTests, self).setUp()
         self.ray = self.create_user('ray')
         self.lux = self.create_user('lux')
 
